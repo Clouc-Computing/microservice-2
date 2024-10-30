@@ -44,11 +44,6 @@ ssh -i "<path_to_key>\coms4153_key_pair.pem" ec2-user@ec2-34-196-69-206.compute-
     psql --host=microservice-2-database.chaomk0okau3.us-east-1.rds.amazonaws.com --port=5432 --dbname=postgres --username=postgres
     ```
 
-* Created by Amazon RDS (rds), aws/secretsmanager:
-    * `username:` postgres
-    * `password:` hK(![9U*OON]FC}c[2r~1Fz|:VLx
-
-
 ## Sprint 2
 
 ### Initial Setup
@@ -105,13 +100,13 @@ ssh -i "<path_to_key>\coms4153_key_pair.pem" ec2-user@ec2-34-196-69-206.compute-
     * The `GET /items` endpoint includes pagination support with page and per_page parameters.
 
 3. Query Parameters:
-    * The GET /items endpoint allows filtering items by name using the name query parameter.
+    * The `GET /items` endpoint allows filtering items by name using the name query parameter.
 
 4. 201 Created with a Link Header for POST:
-    * The POST /items endpoint creates a new item and returns 201 Created with a Location header pointing to the newly created resource.
+    * The `POST /items` endpoint creates a new item and returns 201 Created with a Location header pointing to the newly created resource.
 
 5. 202 Accepted and Implementing an Asynchronous Update to a URL:
-    * The PUT /items/<item_id> endpoint accepts an update request and starts an asynchronous thread to update the item’s description, returning 202 Accepted.
+    * The `PUT /items/<item_id>` endpoint accepts an update request and starts an asynchronous thread to update the item’s description, returning 202 Accepted.
 
 6. Good Response Codes and Error Responses:
     * The code includes appropriate response codes and error handling:
@@ -122,7 +117,7 @@ ssh -i "<path_to_key>\coms4153_key_pair.pem" ec2-user@ec2-34-196-69-206.compute-
     * Custom error handlers provide JSON-formatted responses for 404 and 400 errors.
 
 7. Link Sections:
-    * The GET /items endpoint includes a Link header for pagination, providing a link to the next page of results if available.
+    * The `GET /items` endpoint includes a Link header for pagination, providing a link to the next page of results if available.
 
 
 

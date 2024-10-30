@@ -2,20 +2,25 @@ from flask import Flask, request, jsonify, url_for
 from flask_sqlalchemy import SQLAlchemy
 from threading import Thread
 from time import sleep
+from dotenv import load_dotenv
+import os
 
+# Load environment variables from .env
+load_dotenv()
 
 app = Flask(__name__)
 # postgresql://username:password@host:port/dbname
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:hK(![9U*OON]FC}c[2r~1Fz|:VLx@microservice-2-database.chaomk0okau3.us-east-1.rds.amazonaws.com:5432/postgres'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 '''
-Following code snippets based on microservice-VM git repository,
-We can modify the database model and functions as needed.
+Code based on microservice-VM git repository, containing Item(db.Model)
 '''
 
 class Item(db.Model):
+    __tablename__ = 'items'
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False)
     description = db.Column(db.String(200))
@@ -108,12 +113,11 @@ def bad_request_error(error):
     return jsonify({'error': 'Bad request'}), 400
 
 
-# Example route
+# Example routes
 @app.route('/')
 def index():
-    return jsonify({"message": "Welcome to our food rating app!"}), 200
+    return jsonify({"message": "item d"}), 200
 
-# Example route
 @app.route('/data', methods=['GET'])
 def get_data():
     # Placeholder function to interact with the database
