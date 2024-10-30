@@ -20,15 +20,9 @@ ssh -i "<path_to_key>\coms4153_key_pair.pem" ec2-user@ec2-34-196-69-206.compute-
     ```
     * A public key has been saved in /home/ec2-user/.ssh/id_rsa.pub
 
-* View the SSH Public Key
-    ```bash
-    cat ~/.ssh/id_rsa.pub
-    ```
-
-* Copy the output starting with ssh-rsa and ending with an email address.
-Then, [GitHub SSH and GPG keys settings](https://github.com/settings/keys). 
+* [GitHub SSH and GPG keys settings](https://github.com/settings/keys). 
 * Click on `New SSH key`
-* Paste public key into the "Key" field and save it.
+* Paste public key stored in `~/.ssh/id_rsa.pub` into the "Key" field and save it.
 
 * Clone the Repository Using SSH
     ```bash
@@ -61,12 +55,12 @@ Then, [GitHub SSH and GPG keys settings](https://github.com/settings/keys).
 * Initial Setup
     ```bash
     sudo yum install python3 -y
-    python -m venv env
-    source venv/bin/activate
+    python -m venv venv
+    source .venv/bin/activate
     ```
 
     ```bash
-    pip3 -r requirements.txt
+    pip3 install -r requirements.txt
     ```
 * After installing any python packages:
     ```bash

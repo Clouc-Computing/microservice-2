@@ -27,8 +27,10 @@ class Item(db.Model):
 with app.app_context():
     db.create_all()
 
-@app.route('/items', methods=['GET'])
+@app.route('/api/items', methods=['GET'])
 def get_items():
+
+    # Query String with parameters
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     name_filter = request.args.get('name', None)
@@ -44,12 +46,13 @@ def get_items():
         'pages': items.pages
     }
 
+    # Implement GET on link header for created resource.
     return jsonify(response), 200, {
         'Link': f'<{url_for("get_items", page=page+1, per_page=per_page, _external=True)}>; rel="next"'
     }
 
 
-@app.route('/items', methods=['POST'])
+@app.route('/api/items', methods=['POST'])
 def create_item():
     data = request.json
     if 'name' not in data:
@@ -59,22 +62,22 @@ def create_item():
     db.session.add(new_item)
     db.session.commit()
 
+    # 201 Created with a link header for a POST
     location = url_for('get_item', item_id=new_item.id, _external=True)
     return jsonify({'message': 'Item created!'}), 201, {'Location': location}
 
 
-@app.route('/items/<int:item_id>', methods=['GET'])
+@app.route('/api/items/<int:item_id>', methods=['GET'])
 def get_item(item_id):
     item = Item.query.get_or_404(item_id)
     return jsonify(item.serialize())
 
-
 def async_update(item, description):
-    sleep(5) 
+    sleep(5)
     item.description = description
     db.session.commit()
 
-@app.route('/items/<int:item_id>', methods=['PUT'])
+@app.route('/api/items/<int:item_id>', methods=['PUT'])
 def update_item(item_id):
     item = Item.query.get_or_404(item_id)
     data = request.json
@@ -88,7 +91,7 @@ def update_item(item_id):
     return jsonify({'message': 'Item update accepted'}), 202
 
 
-@app.route('/items/<int:item_id>', methods=['DELETE'])
+@app.route('/api/items/<int:item_id>', methods=['DELETE'])
 def delete_item(item_id):
     item = Item.query.get_or_404(item_id)
     db.session.delete(item)
