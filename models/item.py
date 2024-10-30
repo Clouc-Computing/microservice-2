@@ -32,7 +32,7 @@ class Item(db.Model):
 with app.app_context():
     db.create_all()
 
-@app.route('/api/items', methods=['GET'])
+@app.route('/items', methods=['GET'])
 def get_items():
 
     # Query String with parameters
@@ -72,7 +72,7 @@ def create_item():
     return jsonify({'message': 'Item created!'}), 201, {'Location': location}
 
 
-@app.route('/api/items/<int:item_id>', methods=['GET'])
+@app.route('/items/<int:item_id>', methods=['GET'])
 def get_item(item_id):
     item = Item.query.get_or_404(item_id)
     return jsonify(item.serialize())
@@ -82,7 +82,7 @@ def async_update(item, description):
     item.description = description
     db.session.commit()
 
-@app.route('/api/items/<int:item_id>', methods=['PUT'])
+@app.route('/items/<int:item_id>', methods=['PUT'])
 def update_item(item_id):
     item = Item.query.get_or_404(item_id)
     data = request.json
@@ -96,7 +96,7 @@ def update_item(item_id):
     return jsonify({'message': 'Item update accepted'}), 202
 
 
-@app.route('/api/items/<int:item_id>', methods=['DELETE'])
+@app.route('/items/<int:item_id>', methods=['DELETE'])
 def delete_item(item_id):
     item = Item.query.get_or_404(item_id)
     db.session.delete(item)

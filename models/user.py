@@ -35,7 +35,7 @@ with app.app_context():
     db.create_all()
 
 # Get all users with pagination and username filter
-@app.route('/api/users', methods=['GET'])
+@app.route('/users', methods=['GET'])
 def get_users():
 
     # Query String with parameters
@@ -59,7 +59,7 @@ def get_users():
     }
 
 # Create a new user
-@app.route('/api/users', methods=['POST'])
+@app.route('/users', methods=['POST'])
 def create_user():
     data = request.json
     if 'username' not in data or 'email' not in data or 'password' not in data:
@@ -74,7 +74,7 @@ def create_user():
     return jsonify({'message': 'User created!'}), 201, {'Location': location}
 
 # Get a specific user by ID
-@app.route('/api/users/<int:user_id>', methods=['GET'])
+@app.route('/users/<int:user_id>', methods=['GET'])
 def get_user(user_id):
     user = User.query.get_or_404(user_id)
     return jsonify(user.serialize())
@@ -85,7 +85,7 @@ def async_update(user, email):
     user.email = email
     db.session.commit()
 
-@app.route('/api/users/<int:user_id>', methods=['PUT'])
+@app.route('/users/<int:user_id>', methods=['PUT'])
 def update_user(user_id):
     user = User.query.get_or_404(user_id)
     data = request.json
@@ -98,7 +98,7 @@ def update_user(user_id):
 
     return jsonify({'message': 'User update accepted'}), 202
 
-@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@app.route('/users/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
     db.session.delete(user)
