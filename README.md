@@ -55,13 +55,16 @@ ssh -i "<path_to_key>\coms4153_key_pair.pem" ec2-user@ec2-34-196-69-206.compute-
 * Initial Setup
     ```bash
     sudo yum install python3 -y
-    python -m venv venv
+    python3 -m venv .venv
     source .venv/bin/activate
     ```
+    * Added `.venv/` to `.gitignore` 
 
     ```bash
+    python3 -m pip install --upgrade pip
     pip3 install -r requirements.txt
     ```
+    
 * After installing any python packages:
     ```bash
     pip3 freeze > requirements.txt
