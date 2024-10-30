@@ -22,7 +22,7 @@ Code based on microservice-VM git repository, containing User(db.Model) and func
 # User model with common user attributes
 class User(db.Model):
     __tablename__ = 'users'
-     
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), nullable=False, unique=True)
     email = db.Column(db.String(120), nullable=False, unique=True)
@@ -125,4 +125,4 @@ def get_data():
     return jsonify({"message": "Data retrieved successfully"}), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0', port=5001)
