@@ -118,7 +118,7 @@ def bad_request_error(error):
 # Example routes
 @app.route('/')
 def index():
-    return jsonify({"message": "Welcome to our food rating app!"}), 200
+    return jsonify({"message": "user database model"}), 200
 
 @app.route('/data', methods=['GET'])
 def get_data():
