@@ -57,7 +57,7 @@ def get_items():
     }
 
 
-@app.route('/api/items', methods=['POST'])
+@app.route('/items', methods=['POST'])
 def create_item():
     data = request.json
     if 'name' not in data:
