@@ -27,9 +27,18 @@ class User(db.Model):
     username = db.Column(db.String(80), nullable=False, unique=True)
     email = db.Column(db.String(120), nullable=False, unique=True)
     password = db.Column(db.String(200), nullable=False)
-
     def serialize(self):
         return {'id': self.id, 'username': self.username, 'email': self.email}
+
+class FavoriteFood(db.Model):
+    __tablename__ = 'favorite_foods'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    food_name = db.Column(db.String(80), nullable=False)
+
+    def serialize(self):
+        return {"id": self.id, "food_name": self.food_name}
 
 with app.app_context():
     db.create_all()
@@ -72,7 +81,26 @@ def create_user():
     # 201 Created with a link header for a POST
     location = url_for('get_user', user_id=new_user.id, _external=True)
     return jsonify({'message': 'User created!'}), 201, {'Location': location}
+@app.route('/users/<int:user_id>/subResource', methods=['GET', 'POST'])
+def user_sub_resource(user_id):
+    user = User.query.get_or_404(user_id)
 
+    if request.method == 'GET':
+        # Get all favorite foods for the user
+        favorite_foods = FavoriteFood.query.filter_by(user_id=user.id).all()
+        return jsonify({"user_id": user.id, "favorite_foods": [food.serialize() for food in favorite_foods]}), 200
+
+    elif request.method == 'POST':
+        # Add a new favorite food
+        data = request.json
+        if 'food_name' not in data:
+            return jsonify({"error": "Bad request, missing food_name"}), 400
+
+        new_food = FavoriteFood(user_id=user.id, food_name=data['food_name'])
+        db.session.add(new_food)
+        db.session.commit()
+
+        return jsonify({"message": "Favorite food added!", "food": new_food.serialize()}), 201
 # Get a specific user by ID
 @app.route('/users/<int:user_id>', methods=['GET'])
 def get_user(user_id):
@@ -101,6 +129,7 @@ def update_user(user_id):
 @app.route('/users/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
+    FavoriteFood.query.filter_by(user_id=user.id).delete()
     db.session.delete(user)
     db.session.commit()
     return jsonify({'message': 'User deleted'}), 204

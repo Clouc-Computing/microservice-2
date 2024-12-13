@@ -28,6 +28,16 @@ class Item(db.Model):
     def serialize(self):
         return {'id': self.id, 'name': self.name, 'description': self.description}
 
+class Review(db.Model):
+    __tablename__ = 'reviews'
+
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=False)
+    review = db.Column(db.String(200), nullable=False)
+    rating = db.Column(db.Integer, nullable=False)
+
+    def serialize(self):
+        return {"id": self.id, "review": self.review, "rating": self.rating}
 
 with app.app_context():
     db.create_all()
@@ -99,11 +109,54 @@ def update_item(item_id):
 @app.route('/items/<int:item_id>', methods=['DELETE'])
 def delete_item(item_id):
     item = Item.query.get_or_404(item_id)
+    Review.query.filter_by(item_id=item.id).delete()
     db.session.delete(item)
     db.session.commit()
     return jsonify({'message': 'Item deleted'}), 204
 
+@app.route('/items/<int:item_id>/subResource', methods=['GET', 'POST'])
+def item_sub_resource(item_id):
+    item = Item.query.get_or_404(item_id)
 
+    if request.method == 'GET':
+        # Paginate subresources
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+
+        reviews = Review.query.filter_by(item_id=item.id).paginate(page=page, per_page=per_page, error_out=False)
+        response = {
+            "item_id": item.id,
+            "reviews": [review.serialize() for review in reviews.items],
+            "total": reviews.total,
+            "pages": reviews.pages
+        }
+
+        return jsonify(response), 200
+
+    elif request.method == 'POST':
+        # Add a new review
+        data = request.json
+        if 'review' not in data or 'rating' not in data:
+            return jsonify({"error": "Bad request, missing review or rating"}), 400
+
+        new_review = Review(item_id=item.id, review=data['review'], rating=data['rating'])
+        db.session.add(new_review)
+        db.session.commit()
+
+        return jsonify({"message": "Review created!", "review": new_review.serialize()}), 201
+@app.route('/items/<int:item_id>/subResource/<int:review_id>', methods=['DELETE'])
+def delete_review(item_id, review_id):
+    # Ensure the item exists
+    item = Item.query.get_or_404(item_id)
+
+    # Ensure the review exists and is associated with the item
+    review = Review.query.filter_by(id=review_id, item_id=item.id).first_or_404()
+
+    # Delete the review
+    db.session.delete(review)
+    db.session.commit()
+
+    return jsonify({"message": "Review deleted successfully!"}), 200
 @app.errorhandler(404)
 def not_found_error(error):
     return jsonify({'error': 'Resource not found'}), 404
