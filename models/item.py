@@ -2,9 +2,11 @@ from flask import Flask, request, jsonify, url_for
 from flask_sqlalchemy import SQLAlchemy
 from threading import Thread
 from time import sleep
+import json
 from dotenv import load_dotenv
 import os
-
+import boto3
+import requests
 # Load environment variables from .env
 load_dotenv()
 
@@ -13,6 +15,7 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+sns_client = boto3.client('sns', region_name=os.getenv('AWS_REGION'))
 
 '''
 Code based on microservice-VM git repository, containing Item(db.Model)
@@ -70,6 +73,8 @@ def get_items():
 @app.route('/items', methods=['POST'])
 def create_item():
     data = request.json
+    if 'foodName' in data:
+        print("FOOD NAME IS IN DATA")
     if 'name' not in data:
         return jsonify({'error': 'Bad request, missing name field'}), 400
 
@@ -134,7 +139,6 @@ def item_sub_resource(item_id):
         return jsonify(response), 200
 
     elif request.method == 'POST':
-        # Add a new review
         data = request.json
         if 'review' not in data or 'rating' not in data:
             return jsonify({"error": "Bad request, missing review or rating"}), 400
@@ -142,6 +146,18 @@ def item_sub_resource(item_id):
         new_review = Review(item_id=item.id, review=data['review'], rating=data['rating'])
         db.session.add(new_review)
         db.session.commit()
+        try:
+            notification_data = {
+                "item_id": item.id,
+                "review": data['review'],
+                "rating": data['rating']
+            }
+            notification_url = "http://3.147.35.222:5002/notify"  # Update with the actual host/port
+            notification_response = requests.post(notification_url, json=notification_data)
+            notification_response.raise_for_status()  # Raise exception if the request fails
+            print(f"Notification sent: {notification_response.json()}")
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to send notification: {e}")
 
         return jsonify({"message": "Review created!", "review": new_review.serialize()}), 201
 @app.route('/items/<int:item_id>/subResource/<int:review_id>', methods=['DELETE'])
