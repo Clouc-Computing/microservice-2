@@ -1,8 +1,10 @@
-from flask import Flask, request, jsonify, url_for
+from flask import Flask, request, jsonify, url_for, json
 from flask_sqlalchemy import SQLAlchemy
 from threading import Thread
 from time import sleep
 from dotenv import load_dotenv
+import os
+import boto3
 import os
 
 # Load environment variables from .env
@@ -14,7 +16,8 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
+STEP_FUNCTION_ARN = os.getenv("STEP_FUNCTION_ARN")
+step_functions_client = boto3.client('stepfunctions', region_name='us-east-2')
 '''
 Code based on microservice-VM git repository, containing User(db.Model) and functions.
 '''
@@ -43,10 +46,8 @@ class FavoriteFood(db.Model):
 with app.app_context():
     db.create_all()
 
-# Get all users with pagination and username filter
 @app.route('/users', methods=['GET'])
 def get_users():
-
     # Query String with parameters
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
@@ -60,12 +61,34 @@ def get_users():
     response = {
         'users': [user.serialize() for user in users.items],
         'total': users.total,
-        'pages': users.pages
+        'pages': users.pages,
+        'current_page': page,
+        'links': {
+            'self': url_for('get_users', page=page, per_page=per_page, _external=True),
+            'next': url_for('get_users', page=page + 1, per_page=per_page, _external=True) if users.has_next else None,
+            'prev': url_for('get_users', page=page - 1, per_page=per_page, _external=True) if users.has_prev else None
+        }
     }
 
-    return jsonify(response), 200, {
-        'Link': f'<{url_for("get_users", page=page+1, per_page=per_page, _external=True)}>; rel="next"'
-    }
+    return jsonify(response), 200
+def start_step_function(user_info):
+    try:
+        print("User info before serialization:", user_info)
+
+        if isinstance(user_info, dict):
+            input_json = json.dumps(user_info)
+        else:
+            raise ValueError("user_info must be a dictionary")
+
+        print("Serialized input for Step Function:", input_json)
+
+        response = step_functions_client.start_execution(
+            stateMachineArn=STEP_FUNCTION_ARN,
+            input=input_json  # Use the serialized JSON string
+        )
+        print(f"Step Function started: {response}")
+    except Exception as e:
+        print(f"Error starting Step Function: {e}")
 
 # Create a new user
 @app.route('/users', methods=['POST'])
@@ -80,15 +103,62 @@ def create_user():
 
     # 201 Created with a link header for a POST
     location = url_for('get_user', user_id=new_user.id, _external=True)
-    return jsonify({'message': 'User created!'}), 201, {'Location': location}
+    # Log user creation in Step Function
+    user_info = {
+        "user_id": new_user.id,
+        "username": new_user.username,
+        "email": new_user.email
+    }    
+    Thread(target=start_step_function, args=(user_info,)).start()
+    response = {
+        'message': 'User created!',
+        'user': new_user.serialize(),
+        'links': {
+            'self': location,
+            'favorite_foods': url_for('user_sub_resource', user_id=new_user.id, _external=True)
+        }
+    }
+    return jsonify(response), 201, {'Location': location}
+
+# Get a specific user by ID with HATEOAS
+@app.route('/users/<int:user_id>', methods=['GET'])
+def get_user(user_id):
+    user = User.query.get_or_404(user_id)
+    response = {
+        'user': user.serialize(),
+        'links': {
+            'self': url_for('get_user', user_id=user_id, _external=True),
+            'update': url_for('update_user', user_id=user_id, _external=True),
+            'delete': url_for('delete_user', user_id=user_id, _external=True),
+            'favorite_foods': url_for('user_sub_resource', user_id=user_id, _external=True)
+        }
+    }
+    return jsonify(response), 200
+
+# Get and add favorite foods for a user with pagination and HATEOAS
 @app.route('/users/<int:user_id>/subResource', methods=['GET', 'POST'])
 def user_sub_resource(user_id):
     user = User.query.get_or_404(user_id)
 
     if request.method == 'GET':
-        # Get all favorite foods for the user
-        favorite_foods = FavoriteFood.query.filter_by(user_id=user.id).all()
-        return jsonify({"user_id": user.id, "favorite_foods": [food.serialize() for food in favorite_foods]}), 200
+        # Paginate favorite foods for the user
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+
+        favorite_foods = FavoriteFood.query.filter_by(user_id=user.id).paginate(page=page, per_page=per_page, error_out=False)
+        response = {
+            "user_id": user.id,
+            "favorite_foods": [food.serialize() for food in favorite_foods.items],
+            "total": favorite_foods.total,
+            "pages": favorite_foods.pages,
+            "current_page": page,
+            "links": {
+                'self': url_for('user_sub_resource', user_id=user.id, page=page, per_page=per_page, _external=True),
+                'next': url_for('user_sub_resource', user_id=user.id, page=page + 1, per_page=per_page, _external=True) if favorite_foods.has_next else None,
+                'prev': url_for('user_sub_resource', user_id=user.id, page=page - 1, per_page=per_page, _external=True) if favorite_foods.has_prev else None
+            }
+        }
+        return jsonify(response), 200
 
     elif request.method == 'POST':
         # Add a new favorite food
@@ -100,19 +170,25 @@ def user_sub_resource(user_id):
         db.session.add(new_food)
         db.session.commit()
 
-        return jsonify({"message": "Favorite food added!", "food": new_food.serialize()}), 201
-# Get a specific user by ID
-@app.route('/users/<int:user_id>', methods=['GET'])
-def get_user(user_id):
-    user = User.query.get_or_404(user_id)
-    return jsonify(user.serialize())
+        location = url_for('user_sub_resource', user_id=user.id, _external=True)
+        response = {
+            "message": "Favorite food added!",
+            "food": new_food.serialize(),
+            "links": {
+                'self': location,
+                'user': url_for('get_user', user_id=user.id, _external=True)
+            }
+        }
+        return jsonify(response), 201, {'Location': location}
+
 
 def async_update(user, email):
-    sleep(5)
-    # Update a user's email (or another attribute if needed) asynchronously
-    user.email = email
-    db.session.commit()
-
+    with app.app_context():  # Ensure the application context is available
+        print(f"Starting async update for user {user.id}")
+        sleep(5)  # Simulate delay for the asynchronous operation
+        user.email = email
+        db.session.commit()
+        print(f"Async update completed for user {user.id}")
 @app.route('/users/<int:user_id>', methods=['PUT'])
 def update_user(user_id):
     user = User.query.get_or_404(user_id)

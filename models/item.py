@@ -47,10 +47,9 @@ with app.app_context():
 
 @app.route('/items', methods=['GET'])
 def get_items():
-
     # Query String with parameters
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 10, type=int)
+    per_page = request.args.get('per_page', 2, type=int)
     name_filter = request.args.get('name', None)
 
     query = Item.query
@@ -58,23 +57,27 @@ def get_items():
         query = query.filter(Item.name.ilike(f'%{name_filter}%'))
 
     items = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    # Generate HATEOS links for pagination
+    links = {
+        "self": url_for("get_items", page=page, per_page=per_page, _external=True),
+        "next": url_for("get_items", page=page + 1, per_page=per_page, _external=True) if items.has_next else None,
+        "prev": url_for("get_items", page=page - 1, per_page=per_page, _external=True) if items.has_prev else None,
+    }
+
     response = {
         'items': [item.serialize() for item in items.items],
         'total': items.total,
-        'pages': items.pages
+        'pages': items.pages,
+        '_links': links,
     }
 
-    # Implement GET on link header for created resource.
-    return jsonify(response), 200, {
-        'Link': f'<{url_for("get_items", page=page+1, per_page=per_page, _external=True)}>; rel="next"'
-    }
+    return jsonify(response), 200
 
 
 @app.route('/items', methods=['POST'])
 def create_item():
     data = request.json
-    if 'foodName' in data:
-        print("FOOD NAME IS IN DATA")
     if 'name' not in data:
         return jsonify({'error': 'Bad request, missing name field'}), 400
 
@@ -82,10 +85,20 @@ def create_item():
     db.session.add(new_item)
     db.session.commit()
 
-    # 201 Created with a link header for a POST
+    # Generate HATEOS links for the created item
     location = url_for('get_item', item_id=new_item.id, _external=True)
-    return jsonify({'message': 'Item created!'}), 201, {'Location': location}
+    links = {
+        "self": location,
+        "update": url_for('update_item', item_id=new_item.id, _external=True),
+        "delete": url_for('delete_item', item_id=new_item.id, _external=True),
+        "reviews": url_for('item_sub_resource', item_id=new_item.id, _external=True),
+    }
 
+    return jsonify({
+        'id': new_item.id,
+        'message': 'Item created!',
+        '_links': links
+    }), 201, {'Location': location}
 
 @app.route('/items/<int:item_id>', methods=['GET'])
 def get_item(item_id):
@@ -93,9 +106,12 @@ def get_item(item_id):
     return jsonify(item.serialize())
 
 def async_update(item, description):
-    sleep(5)
-    item.description = description
-    db.session.commit()
+    with app.app_context():  # Set up the application context
+        print(f"Starting async update for item {item.id}")
+        sleep(5)  # Simulate delay for the asynchronous operation
+        item.description = description
+        db.session.commit()
+        print(f"Async update completed for item {item.id}")
 
 @app.route('/items/<int:item_id>', methods=['PUT'])
 def update_item(item_id):
@@ -129,11 +145,18 @@ def item_sub_resource(item_id):
         per_page = request.args.get('per_page', 10, type=int)
 
         reviews = Review.query.filter_by(item_id=item.id).paginate(page=page, per_page=per_page, error_out=False)
+        links = {
+            "self": url_for('item_sub_resource', item_id=item_id, page=page, per_page=per_page, _external=True),
+            "next": url_for('item_sub_resource', item_id=item_id, page=page + 1, per_page=per_page, _external=True) if reviews.has_next else None,
+            "prev": url_for('item_sub_resource', item_id=item_id, page=page - 1, per_page=per_page, _external=True) if reviews.has_prev else None,
+        }
+
         response = {
             "item_id": item.id,
             "reviews": [review.serialize() for review in reviews.items],
             "total": reviews.total,
-            "pages": reviews.pages
+            "pages": reviews.pages,
+            "_links": links,
         }
 
         return jsonify(response), 200
@@ -146,15 +169,16 @@ def item_sub_resource(item_id):
         new_review = Review(item_id=item.id, review=data['review'], rating=data['rating'])
         db.session.add(new_review)
         db.session.commit()
+
         try:
             notification_data = {
                 "item_id": item.id,
                 "review": data['review'],
                 "rating": data['rating']
             }
-            notification_url = "http://3.147.35.222:5002/notify"  # Update with the actual host/port
+            notification_url = "http://3.147.35.222:5002/notify"
             notification_response = requests.post(notification_url, json=notification_data)
-            notification_response.raise_for_status()  # Raise exception if the request fails
+            notification_response.raise_for_status() 
             print(f"Notification sent: {notification_response.json()}")
         except requests.exceptions.RequestException as e:
             print(f"Failed to send notification: {e}")
